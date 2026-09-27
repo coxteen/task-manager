@@ -1,66 +1,60 @@
+import sys
 import customtkinter as ctk
-from tkinter import ttk
-import create_window as cw
-from screeninfo import get_monitors
+from window_factory import create_main_window
+from system_metrics import SystemMetricsService
 import cpu_tab
 import gpu_tab
 import ram_tab
 import storage_tab
 import theme_tab
-def create_tabs(window):
-    style = ttk.Style()
-    style.theme_create('dark_mode', parent='alt', settings={
-        'TNotebook': {
-            'configure': {
-                'background': '#333333',
-                'tabmargins': [2, 5, 2, 0],
-            }
-        },
-        'TNotebook.Tab': {
-            'configure': {
-                'background': '#000000',
-                'foreground': '#FFFFFF',
-                'padding': [50, 5],
-            },
-            'map': {
-                'background': [('selected', '#333333'), ('active', '#222222')],
-                'foreground': [('selected', '#FFFFFF'), ('active', '#FFFFFF')],
-            }
-        }
-    })
-    style.theme_use('dark_mode')
 
-    notebook = ttk.Notebook(window, style='TNotebook')
-    notebook.pack(expand=True, fill='both')
 
-    cpu_frame = ctk.CTkFrame(notebook)
-    cpu_tab.create_cpu_window(cpu_frame)
-    notebook.add(cpu_frame, text='CPU')
+class TaskManagerApp:
+    def __init__(self, root: ctk.CTk):
+        self.root = root
+        self.metrics_service = SystemMetricsService()
 
-    gpu_frame = ctk.CTkFrame(notebook)
-    gpu_tab.create_gpu_tab(gpu_frame)
-    notebook.add(gpu_frame, text='GPU')
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-    ram_frame = ctk.CTkFrame(notebook)
-    ram_tab.create_ram_window(ram_frame)
-    notebook.add(ram_frame, text='RAM')
+        self.tabview = ctk.CTkTabview(self.root)
+        self.tabview.pack(expand=True, fill="both", padx=10, pady=10)
 
-    storage_frame=ctk.CTkFrame(notebook)
-    storage_tab.create_storage_tab(storage_frame)
-    notebook.add(storage_frame, text='Storage')
+        self.tab_cpu = self.tabview.add("CPU")
+        self.tab_gpu = self.tabview.add("GPU")
+        self.tab_ram = self.tabview.add("RAM")
+        self.tab_storage = self.tabview.add("Storage")
+        self.tab_theme = self.tabview.add("Theme")
 
-    theme_frame = ctk.CTkFrame(notebook)
-    theme_tab.create_theme_tab(theme_frame)
-    notebook.add(theme_frame, text='Theme')
+        self.cpu_view = cpu_tab.create_cpu_tab(self.tab_cpu, self.metrics_service)
+        self.gpu_view = gpu_tab.create_gpu_tab(self.tab_gpu, self.metrics_service)
+        self.ram_view = ram_tab.create_ram_tab(self.tab_ram, self.metrics_service)
+        self.storage_view = storage_tab.create_storage_tab(self.tab_storage, self.metrics_service)
+        self.theme_view = theme_tab.create_theme_tab(self.tab_theme)
 
-    return notebook
+    def on_closing(self):
+        for view in (self.cpu_view, self.gpu_view, self.ram_view):
+            if hasattr(view, "cleanup"):
+                view.cleanup()
 
+        try:
+            self.metrics_service.stop()
+        except Exception:
+            pass
+
+        try:
+            self.root.quit()
+            self.root.destroy()
+        except Exception:
+            pass
+
+        sys.exit(0)
 
 
 def main():
-    window = cw.create_window()
-    create_tabs(window)
-    window.mainloop()
+    root = create_main_window()
+    app = TaskManagerApp(root)
+    root.mainloop()
+
 
 if __name__ == "__main__":
     main()

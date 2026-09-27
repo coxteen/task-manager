@@ -1,62 +1,121 @@
+from collections import deque
 import customtkinter as ctk
-import psutil
-import ctypes
-import cpuinfo
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from system_metrics import SystemMetricsService
 
 
-def create_cpu_window(frame):
+class CpuTab:
+    """Componentă UI responsabilă exclusiv de vizualizarea stării procesorului (CPU)."""
 
-    cpu_font = ("Helvetica", 40)
-    name_font = ("Helvetica", 26)
-    middle_font = ("Helvetica", 20)
-    small_font = ("Helvetica", 16)
+    def __init__(self, parent_frame: ctk.CTkFrame, metrics_service: SystemMetricsService):
+        self.frame = parent_frame
+        self.metrics_service = metrics_service
 
-    cpu_label = ctk.CTkLabel(master=frame, text="CPU", font=cpu_font)
-    cpu_name_label = ctk.CTkLabel(master=frame, text=cpuinfo.get_cpu_info()['brand_raw'], font=name_font)
-    utilization_label = ctk.CTkLabel(master=frame, text=f"Utilization : {psutil.cpu_percent()}%", font=middle_font)
-    speed_label = ctk.CTkLabel(master=frame, text=f"Speed : {psutil.cpu_freq()}", font=middle_font)
-    processes_label = ctk.CTkLabel(master=frame, text=f"Processes : {psutil.cpu_count()}", font=middle_font)
-    base_speed_label = ctk.CTkLabel(master=frame, text="Base speed : ", font=small_font)
-    cores_label = ctk.CTkLabel(master=frame, text="Cores : ", font=small_font)
-    logical_processors_label = ctk.CTkLabel(master=frame, text="Logical processors : ", font=small_font)
-    up_time_label = ctk.CTkLabel(master=frame, text="Up time : ", font=middle_font)
+        self.history_length = 60
+        self.history = deque([0.0] * self.history_length, maxlen=self.history_length)
 
-    big_padding = 30
-    small_padding = 20
-    fist_column_left_padding = 60
-    left_padding = 200
+        self._init_layout()
+        self._init_graph()
+        self._schedule_update()
 
-    cpu_label.grid(row=0, column=0, padx=(fist_column_left_padding, 0), pady=big_padding, sticky="w")
-    cpu_name_label.grid(row=0, column=1, padx=(10, 0), pady=big_padding, sticky="w")
-    utilization_label.grid(row=1, column=0, padx=(fist_column_left_padding, 0), pady=small_padding, sticky="w")
-    speed_label.grid(row=2, column=0, padx=(fist_column_left_padding, 0), pady=small_padding, sticky="w")
-    processes_label.grid(row=3, column=0, padx=(fist_column_left_padding, 0), pady=small_padding, sticky="w")
-    base_speed_label.grid(row=1, column=1, padx=(left_padding, 0), pady=small_padding, sticky="w")
-    cores_label.grid(row=2, column=1, padx=(left_padding, 0), pady=small_padding, sticky="w")
-    logical_processors_label.grid(row=3, column=1, padx=(left_padding, 0), pady=small_padding, sticky="w")
-    up_time_label.grid(row=1, column=2, padx=(fist_column_left_padding, 0), pady=small_padding, sticky="w")
+    def _init_layout(self):
+        self.frame.grid_columnconfigure(0, weight=0, minsize=260)
+        self.frame.grid_columnconfigure(1, weight=1)
+        self.frame.grid_rowconfigure(0, weight=1)
 
-    def count_processes():
-        sum = 0
-        for process in psutil.process_iter():
-            sum += 1
-        return sum
+        self.info_panel = ctk.CTkFrame(self.frame, corner_radius=10)
+        self.info_panel.grid(row=0, column=0, sticky="nsew", padx=15, pady=15)
+
+        title_label = ctk.CTkLabel(
+            self.info_panel,
+            text="CPU Monitor",
+            font=ctk.CTkFont(family="Helvetica", size=26, weight="bold")
+        )
+        title_label.pack(anchor="w", padx=20, pady=(20, 10))
+
+        self.usage_label = ctk.CTkLabel(
+            self.info_panel,
+            text="Utilization: -- %",
+            font=ctk.CTkFont(family="Helvetica", size=18)
+        )
+        self.usage_label.pack(anchor="w", padx=20, pady=8)
+
+        self.cores_label = ctk.CTkLabel(
+            self.info_panel,
+            text="Cores: --",
+            font=ctk.CTkFont(family="Helvetica", size=14)
+        )
+        self.cores_label.pack(anchor="w", padx=20, pady=5)
+
+        self.freq_label = ctk.CTkLabel(
+            self.info_panel,
+            text="Frequency: -- MHz",
+            font=ctk.CTkFont(family="Helvetica", size=14)
+        )
+        self.freq_label.pack(anchor="w", padx=20, pady=5)
+
+    def _init_graph(self):
+        self.graph_container = ctk.CTkFrame(self.frame, corner_radius=10)
+        self.graph_container.grid(row=0, column=1, sticky="nsew", padx=(0, 15), pady=15)
+
+        self.fig, self.ax = plt.subplots(figsize=(6, 4), dpi=100)
+        self.fig.patch.set_facecolor("#242424")
+        self.ax.set_facecolor("#1f1f1f")
+
+        self.line, = self.ax.plot(
+            range(self.history_length),
+            list(self.history),
+            color="#3a7ebf",
+            linewidth=2,
+            label="CPU %"
+        )
+
+        self.ax.set_ylim(0, 100)
+        self.ax.set_xlim(0, self.history_length - 1)
+        self.ax.tick_params(colors="#a0a0a0", labelsize=9)
+        self.ax.spines["bottom"].set_color("#404040")
+        self.ax.spines["top"].set_color("#404040")
+        self.ax.spines["right"].set_color("#404040")
+        self.ax.spines["left"].set_color("#404040")
+        self.ax.grid(True, linestyle="--", alpha=0.3, color="#606060")
+        self.ax.set_ylabel("Utilization (%)", color="#d0d0d0", fontsize=10)
+        self.fig.tight_layout()
+
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_container)
+        self.canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
+
+    def _schedule_update(self):
+        try:
+            if not self.frame.winfo_exists():
+                return
+            self._update_metrics()
+            self._after_id = self.frame.after(1000, self._schedule_update)
+        except Exception:
+            pass
+
+    def cleanup(self):
+        if hasattr(self, "_after_id"):
+            try:
+                self.frame.after_cancel(self._after_id)
+            except Exception:
+                pass
+
+    def _update_metrics(self):
+        metrics = self.metrics_service.get_cpu_metrics()
+
+        self.usage_label.configure(text=f"Utilization: {metrics.total_percent:.1f}%")
+        self.cores_label.configure(
+            text=f"Cores: {metrics.physical_cores} Physical / {metrics.logical_cores} Logical"
+        )
+        freq_text = f"{metrics.frequency_mhz:.0f} MHz" if metrics.frequency_mhz else "N/A"
+        self.freq_label.configure(text=f"Frequency: {freq_text}")
+
+        self.history.append(metrics.total_percent)
+        self.line.set_ydata(list(self.history))
+        self.canvas.draw_idle()
 
 
-    def update_utilization():
-
-        utilization_label.configure(text=f"Utilization : {psutil.cpu_percent()}%")
-        speed_label.configure(text=f"Speed : {psutil.cpu_freq().current} MHz")
-        processes_label.configure(text=f"Processes : {count_processes()}")
-        t = int(str(ctypes.windll.kernel32.GetTickCount64())[:-3])
-        mins, sec = divmod(t, 60)
-        hours, mins = divmod(mins, 60)
-        days, hours = divmod(hours, 24)
-        up_time_label.configure(text=f"Up time : {days}d {hours}h {mins}m {sec}s")
-        base_speed_label.configure(text=f"Base speed : {psutil.cpu_freq().max/ 1000} GHz")
-        cores_label.configure(text=f"Cores : {psutil.cpu_count(logical=False)}")
-        logical_processors_label.configure(text=f"Logical processors : {psutil.cpu_count(logical=True)}")
-
-        frame.after(1000, update_utilization)
-
-    update_utilization()
+def create_cpu_tab(frame: ctk.CTkFrame, metrics_service: SystemMetricsService) -> CpuTab:
+    """Punct de intrare pentru instanțierea componentei CPU."""
+    return CpuTab(frame, metrics_service)

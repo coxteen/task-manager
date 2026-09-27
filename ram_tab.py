@@ -1,66 +1,130 @@
-import psutil
+from collections import deque
 import customtkinter as ctk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from system_metrics import SystemMetricsService
 
-def create_ram_window(frame):
 
-    ram_font = ("Helvetica", 40)
-    middle_font = ("Helvetica", 20)
-    small_font = ("Helvetica", 16)
+class RamTab:
+    """Componentă UI pentru monitorizarea memoriei RAM."""
 
-    ram_label = ctk.CTkLabel(master=frame, text="RAM", font=ram_font)
-    total_label = ctk.CTkLabel(master=frame, text=f"Total : {psutil.virtual_memory().total / (1024 ** 3):.2f} GB", font=middle_font)
-    available_label = ctk.CTkLabel(master=frame, text=f"Available : {psutil.virtual_memory().available / (1024 ** 3):.2f} GB", font=middle_font)
-    used_label = ctk.CTkLabel(master=frame, text=f"Used : {psutil.virtual_memory().used / (1024 ** 3):.2f} GB", font=middle_font)
-    percent_label = ctk.CTkLabel(master=frame, text=f"Usage : {psutil.virtual_memory().percent}%", font=middle_font)
+    def __init__(self, parent_frame: ctk.CTkFrame, metrics_service: SystemMetricsService):
+        self.frame = parent_frame
+        self.metrics_service = metrics_service
 
-    big_padding = 30
-    small_padding = 20
-    left_padding = 60
+        self.history_length = 60
+        self.history = deque([0.0] * self.history_length, maxlen=self.history_length)
 
-    ram_label.grid(row=0, column=0, padx=(left_padding, 0), pady=big_padding, sticky="w")
-    total_label.grid(row=1, column=0, padx=(left_padding, 0), pady=small_padding, sticky="w")
-    available_label.grid(row=2, column=0, padx=(left_padding, 0), pady=small_padding, sticky="w")
-    used_label.grid(row=3, column=0, padx=(left_padding, 0), pady=small_padding, sticky="w")
-    percent_label.grid(row=4, column=0, padx=(left_padding, 0), pady=small_padding, sticky="w")
+        self._init_layout()
+        self._init_graph()
+        self._schedule_update()
 
-    # Graph
-    fig, ax = plt.subplots(facecolor='#808080', figsize=(10, 6))
+    def _init_layout(self):
+        self.frame.grid_columnconfigure(0, weight=0, minsize=280)
+        self.frame.grid_columnconfigure(1, weight=1)
+        self.frame.grid_rowconfigure(0, weight=1)
 
-    canvas = FigureCanvasTkAgg(fig, master=frame)
-    canvas.get_tk_widget().place(x=350, y=150, width=1000, height=300)
-    memory_percentages = []
+        self.info_panel = ctk.CTkFrame(self.frame, corner_radius=10)
+        self.info_panel.grid(row=0, column=0, sticky="nsew", padx=15, pady=15)
 
-    def update_graph():
-        memory_percentages.append(psutil.virtual_memory().percent)
+        title_label = ctk.CTkLabel(
+            self.info_panel,
+            text="Memory (RAM)",
+            font=ctk.CTkFont(family="Helvetica", size=24, weight="bold")
+        )
+        title_label.pack(anchor="w", padx=20, pady=(20, 15))
 
-        if len(memory_percentages) > 60:
-            del memory_percentages[0]
+        self.usage_label = ctk.CTkLabel(
+            self.info_panel,
+            text="Usage: -- %",
+            font=ctk.CTkFont(family="Helvetica", size=18)
+        )
+        self.usage_label.pack(anchor="w", padx=20, pady=5)
 
-        memory_percentages[:] = memory_percentages[-60:]
+        self.progress_bar = ctk.CTkProgressBar(self.info_panel, height=12)
+        self.progress_bar.set(0.0)
+        self.progress_bar.pack(fill="x", padx=20, pady=(5, 15))
 
-        ax.clear()
-        ax.plot(memory_percentages, label='Memory Usage (%)', color='orange')
-        ax.set_xlabel('')
-        ax.set_ylabel('Memory Usage (%)')
-        ax.set_ylim(0, 100)
-        ax.set_xticks([])
-        ax.set_xticklabels([])
-        ax.legend(loc='upper right')
-        ax.grid(True)
+        self.used_label = ctk.CTkLabel(
+            self.info_panel,
+            text="Used: -- GB",
+            font=ctk.CTkFont(family="Helvetica", size=14)
+        )
+        self.used_label.pack(anchor="w", padx=20, pady=5)
 
-        canvas.draw()
+        self.available_label = ctk.CTkLabel(
+            self.info_panel,
+            text="Available: -- GB",
+            font=ctk.CTkFont(family="Helvetica", size=14)
+        )
+        self.available_label.pack(anchor="w", padx=20, pady=5)
 
-        frame.after(1000, update_graph)
+        self.total_label = ctk.CTkLabel(
+            self.info_panel,
+            text="Total: -- GB",
+            font=ctk.CTkFont(family="Helvetica", size=14)
+        )
+        self.total_label.pack(anchor="w", padx=20, pady=5)
 
-    def update_ram():
-        total_label.configure(text=f"Total : {psutil.virtual_memory().total / (1024 ** 3):.2f} GB")
-        available_label.configure(text=f"Available : {psutil.virtual_memory().available / (1024 ** 3):.2f} GB")
-        used_label.configure(text=f"Used : {psutil.virtual_memory().used / (1024 ** 3):.2f} GB")
-        percent_label.configure(text=f"Usage : {psutil.virtual_memory().percent}%")
+    def _init_graph(self):
+        self.graph_container = ctk.CTkFrame(self.frame, corner_radius=10)
+        self.graph_container.grid(row=0, column=1, sticky="nsew", padx=(0, 15), pady=15)
 
-        frame.after(1000, update_ram)
+        self.fig, self.ax = plt.subplots(figsize=(6, 4), dpi=100)
+        self.fig.patch.set_facecolor("#242424")
+        self.ax.set_facecolor("#1f1f1f")
 
-    update_ram()
-    update_graph()
+        self.line, = self.ax.plot(
+            range(self.history_length),
+            list(self.history),
+            color="#2fa572",
+            linewidth=2,
+            label="RAM %"
+        )
+
+        self.ax.set_ylim(0, 100)
+        self.ax.set_xlim(0, self.history_length - 1)
+        self.ax.tick_params(colors="#a0a0a0", labelsize=9)
+        self.ax.spines["bottom"].set_color("#404040")
+        self.ax.spines["top"].set_color("#404040")
+        self.ax.spines["right"].set_color("#404040")
+        self.ax.spines["left"].set_color("#404040")
+        self.ax.grid(True, linestyle="--", alpha=0.3, color="#606060")
+        self.ax.set_ylabel("Memory Usage (%)", color="#d0d0d0", fontsize=10)
+        self.fig.tight_layout()
+
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_container)
+        self.canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
+
+    def _schedule_update(self):
+        try:
+            if not self.frame.winfo_exists():
+                return
+            self._update_metrics()
+            self._after_id = self.frame.after(1000, self._schedule_update)
+        except Exception:
+            pass
+
+    def cleanup(self):
+        if hasattr(self, "_after_id"):
+            try:
+                self.frame.after_cancel(self._after_id)
+            except Exception:
+                pass
+
+    def _update_metrics(self):
+        metrics = self.metrics_service.get_ram_metrics()
+
+        self.usage_label.configure(text=f"Usage: {metrics.percent:.1f}%")
+        self.progress_bar.set(metrics.percent / 100.0)
+        self.used_label.configure(text=f"Used: {metrics.used_gb:.2f} GB")
+        self.available_label.configure(text=f"Available: {metrics.available_gb:.2f} GB")
+        self.total_label.configure(text=f"Total: {metrics.total_gb:.2f} GB")
+
+        self.history.append(metrics.percent)
+        self.line.set_ydata(list(self.history))
+        self.canvas.draw_idle()
+
+
+def create_ram_tab(frame: ctk.CTkFrame, metrics_service: SystemMetricsService) -> RamTab:
+    return RamTab(frame, metrics_service)

@@ -1,19 +1,63 @@
 import customtkinter as ctk
 
-def create_theme_tab(frame):
-    theme_font = ("Helvetica", 40)
-    middle_font = ("Helvetica", 20)
 
-    theme_label = ctk.CTkLabel(master=frame, text="Themes", font=theme_font)
-    theme_label.pack(pady=20)
+class ThemeTab:
+    """Componentă UI pentru gestionarea aspectului vizual (Light/Dark/System)."""
 
-    def set_theme(theme):
-        ctk.set_appearance_mode(theme)
+    def __init__(self, parent_frame: ctk.CTkFrame):
+        self.frame = parent_frame
+        self._init_layout()
 
-    light_button = ctk.CTkButton(master=frame, text="Light Theme", font=middle_font, command=lambda: set_theme("light"))
-    dark_button = ctk.CTkButton(master=frame, text="Dark Theme", font=middle_font, command=lambda: set_theme("dark"))
-    system_button = ctk.CTkButton(master=frame, text="System Theme", font=middle_font, command=lambda: set_theme("system"))
+    def _init_layout(self):
+        center_card = ctk.CTkFrame(self.frame, corner_radius=12)
+        center_card.pack(expand=True, padx=40, pady=40)
 
-    light_button.pack(pady=10)
-    dark_button.pack(pady=10)
-    system_button.pack(pady=10)
+        title = ctk.CTkLabel(
+            center_card,
+            text="Appearance Settings",
+            font=ctk.CTkFont(family="Helvetica", size=22, weight="bold")
+        )
+        title.pack(padx=40, pady=(30, 10))
+
+        subtitle = ctk.CTkLabel(
+            center_card,
+            text="Choose your preferred color theme:",
+            font=ctk.CTkFont(size=14),
+            text_color="#909090"
+        )
+        subtitle.pack(padx=40, pady=(0, 20))
+
+        btn_dark = ctk.CTkButton(
+            center_card,
+            text="Dark Mode",
+            width=200,
+            height=38,
+            command=lambda: ctk.set_appearance_mode("dark")
+        )
+        btn_dark.pack(padx=40, pady=8)
+
+        btn_light = ctk.CTkButton(
+            center_card,
+            text="Light Mode",
+            width=200,
+            height=38,
+            fg_color="#4f6378",
+            hover_color="#3d4f61",
+            command=lambda: ctk.set_appearance_mode("light")
+        )
+        btn_light.pack(padx=40, pady=8)
+
+        btn_system = ctk.CTkButton(
+            center_card,
+            text="Sync with System",
+            width=200,
+            height=38,
+            fg_color="#3a3a3a",
+            hover_color="#4a4a4a",
+            command=lambda: ctk.set_appearance_mode("system")
+        )
+        btn_system.pack(padx=40, pady=(8, 30))
+
+
+def create_theme_tab(frame: ctk.CTkFrame) -> ThemeTab:
+    return ThemeTab(frame)
