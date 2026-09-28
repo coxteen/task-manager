@@ -13,6 +13,12 @@
 
 ---
 
+<p align="center">
+  <img src="./assets/demo.gif" alt="Task Manager interactive demo" width="850">
+</p>
+
+---
+
 ## 📌 Problem & Motivation
 
 Monitoring system performance in a typical desktop environment often requires switching between multiple tools or relying on the built-in Windows Task Manager. Developers and users who want a lightweight, single-window overview of live device statistics need a clear and accessible interface.
@@ -33,7 +39,7 @@ Monitoring system performance in a typical desktop environment often requires sw
 - **🗂️ Storage overview:** Lists accessible partitions and reports total, used, free space, filesystem type, and usage percentage.
 - **🌗 Theme customization:** Allows switching between dark, light, and system appearance modes.
 
-CPU, RAM, and GPU views refresh once per second. Storage is read when the Storage tab is initialized and is not continuously refreshed.
+CPU, RAM, and GPU views refresh once per second. The Storage tab refreshes partition usage every two seconds.
 
 ---
 

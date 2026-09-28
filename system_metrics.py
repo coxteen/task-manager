@@ -85,7 +85,6 @@ class SystemMetricsService:
         self._lock = threading.Lock()
         self.nvidia_smi_path = self._locate_nvidia_smi()
 
-        # Inițializăm metricile de bază
         self._current_cpu = CpuMetrics(
             0.0, [], None, psutil.cpu_count(logical=True) or 1, psutil.cpu_count(logical=False) or 1
         )
