@@ -2,7 +2,7 @@
 
 # TaskManager
 
-**A desktop system-monitoring dashboard that brings real-time CPU, GPU, RAM, and storage information into a clean Windows-inspired interface.**
+**A desktop system-monitoring dashboard that brings real-time CPU, GPU, RAM, and storage information into a clean Windows-inspired interface**
 
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=microsoft&logoColor=white)](#)
 [![Framework](https://img.shields.io/badge/CustomTkinter-6.x-3ECF8E?style=flat-square&logo=python&logoColor=white)](https://github.com/TomSchimansky/CustomTkinter)
