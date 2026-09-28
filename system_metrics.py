@@ -80,26 +80,23 @@ class GpuMetrics:
 
 
 class SystemMetricsService:
-    """
-    Serviciu thread-safe care colectează metricile pe un thread de fundal dedicat.
-    Interfața grafică consumă valorile instantaneu din memorie (fără latență I/O sau WMI).
-    """
-
     def __init__(self):
         self._running = True
         self._lock = threading.Lock()
         self.nvidia_smi_path = self._locate_nvidia_smi()
 
-        self._current_cpu = CpuMetrics(0.0, [], None, psutil.cpu_count(logical=True) or 1, psutil.cpu_count(logical=False) or 1)
+        # Inițializăm metricile de bază
+        self._current_cpu = CpuMetrics(
+            0.0, [], None, psutil.cpu_count(logical=True) or 1, psutil.cpu_count(logical=False) or 1
+        )
         self._current_ram = RamMetrics(0, 0, 0, 0.0)
-        self._current_disks: List[DiskPartitionMetrics] = []
+        self._current_disks: List[DiskPartitionMetrics] = self._collect_disk_metrics()
         self._current_gpu = GpuMetrics("Detecting...", 0.0, None, None, None, "Initializing", True)
 
         self._worker_thread = threading.Thread(target=self._background_collector_loop, daemon=True)
         self._worker_thread.start()
 
     def stop(self):
-        """Oprește colectarea în fundal."""
         self._running = False
 
     def _locate_nvidia_smi(self) -> Optional[str]:
@@ -116,9 +113,39 @@ class SystemMetricsService:
                 return path
         return None
 
+    def _collect_disk_metrics(self) -> List[DiskPartitionMetrics]:
+        disks = []
+        try:
+            partitions = psutil.disk_partitions(all=False)
+        except Exception:
+            partitions = []
+
+        for part in partitions:
+            if "cdrom" in part.opts or part.fstype == "":
+                continue
+
+            target = part.mountpoint if part.mountpoint else part.device
+            try:
+                usage = psutil.disk_usage(target)
+                disks.append(
+                    DiskPartitionMetrics(
+                        device=part.device,
+                        mountpoint=part.mountpoint,
+                        fstype=part.fstype if part.fstype else "NTFS",
+                        total_bytes=usage.total,
+                        used_bytes=usage.used,
+                        free_bytes=usage.free,
+                        percent=usage.percent,
+                    )
+                )
+            except (PermissionError, OSError):
+                continue
+        return disks
+
     def _background_collector_loop(self):
         wmi_obj = None
-        generic_gpu_name = "Generic Video Adapter"
+        generic_gpu_name = "Generic Display Adapter"
+
         if WMI_AVAILABLE:
             try:
                 pythoncom.CoInitialize()
@@ -151,24 +178,7 @@ class SystemMetricsService:
                 percent=vmem.percent,
             )
 
-            disks = []
-            for part in psutil.disk_partitions(all=False):
-                try:
-                    usage = psutil.disk_usage(part.mountpoint)
-                    disks.append(
-                        DiskPartitionMetrics(
-                            device=part.device,
-                            mountpoint=part.mountpoint,
-                            fstype=part.fstype,
-                            total_bytes=usage.total,
-                            used_bytes=usage.used,
-                            free_bytes=usage.free,
-                            percent=usage.percent,
-                        )
-                    )
-                except (PermissionError, OSError):
-                    continue
-
+            disks = self._collect_disk_metrics()
             gpu = self._collect_gpu_metrics(wmi_obj, generic_gpu_name)
 
             with self._lock:

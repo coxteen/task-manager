@@ -6,11 +6,10 @@ from system_metrics import SystemMetricsService
 
 
 class GpuTab:
-    """Componentă UI pentru monitorizarea plăcii video Nvidia (cu fallback graceful)."""
-
     def __init__(self, parent_frame: ctk.CTkFrame, metrics_service: SystemMetricsService):
         self.frame = parent_frame
         self.metrics_service = metrics_service
+        self._after_id = None
 
         self.history_length = 60
         self.util_history = deque([0.0] * self.history_length, maxlen=self.history_length)
@@ -116,13 +115,6 @@ class GpuTab:
         except Exception:
             pass
 
-    def cleanup(self):
-        if hasattr(self, "_after_id"):
-            try:
-                self.frame.after_cancel(self._after_id)
-            except Exception:
-                pass
-
     def _update_metrics(self):
         gpu = self.metrics_service.get_gpu_metrics()
 
@@ -142,7 +134,7 @@ class GpuTab:
             self.temp_label.configure(text=f"Temperature: {gpu.temperature_celsius:.1f} °C")
             self.temp_history.append(gpu.temperature_celsius)
         else:
-            self.temp_label.configure(text="Temperature: N/A (Driver unsupported)")
+            self.temp_label.configure(text="Temperature: N/A (OS Generic)")
             self.temp_history.append(0.0)
 
         if gpu.memory_used_mb is not None and gpu.memory_total_mb is not None:
@@ -150,13 +142,20 @@ class GpuTab:
                 text=f"VRAM: {gpu.memory_used_mb:.0f} / {gpu.memory_total_mb:.0f} MB"
             )
         else:
-            self.mem_label.configure(text="VRAM: Managed by OS / Dynamic")
+            self.mem_label.configure(text="VRAM: Shared / Dynamic")
 
         self.util_history.append(gpu.utilization_percent)
 
         self.line_util.set_ydata(list(self.util_history))
         self.line_temp.set_ydata(list(self.temp_history))
         self.canvas.draw_idle()
+
+    def cleanup(self):
+        if self._after_id:
+            try:
+                self.frame.after_cancel(self._after_id)
+            except Exception:
+                pass
 
 
 def create_gpu_tab(frame: ctk.CTkFrame, metrics_service: SystemMetricsService) -> GpuTab:

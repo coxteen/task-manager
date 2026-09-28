@@ -6,11 +6,10 @@ from system_metrics import SystemMetricsService
 
 
 class RamTab:
-    """Componentă UI pentru monitorizarea memoriei RAM."""
-
     def __init__(self, parent_frame: ctk.CTkFrame, metrics_service: SystemMetricsService):
         self.frame = parent_frame
         self.metrics_service = metrics_service
+        self._after_id = None
 
         self.history_length = 60
         self.history = deque([0.0] * self.history_length, maxlen=self.history_length)
@@ -85,10 +84,8 @@ class RamTab:
         self.ax.set_ylim(0, 100)
         self.ax.set_xlim(0, self.history_length - 1)
         self.ax.tick_params(colors="#a0a0a0", labelsize=9)
-        self.ax.spines["bottom"].set_color("#404040")
-        self.ax.spines["top"].set_color("#404040")
-        self.ax.spines["right"].set_color("#404040")
-        self.ax.spines["left"].set_color("#404040")
+        for spine in self.ax.spines.values():
+            spine.set_color("#404040")
         self.ax.grid(True, linestyle="--", alpha=0.3, color="#606060")
         self.ax.set_ylabel("Memory Usage (%)", color="#d0d0d0", fontsize=10)
         self.fig.tight_layout()
@@ -105,13 +102,6 @@ class RamTab:
         except Exception:
             pass
 
-    def cleanup(self):
-        if hasattr(self, "_after_id"):
-            try:
-                self.frame.after_cancel(self._after_id)
-            except Exception:
-                pass
-
     def _update_metrics(self):
         metrics = self.metrics_service.get_ram_metrics()
 
@@ -124,6 +114,13 @@ class RamTab:
         self.history.append(metrics.percent)
         self.line.set_ydata(list(self.history))
         self.canvas.draw_idle()
+
+    def cleanup(self):
+        if self._after_id:
+            try:
+                self.frame.after_cancel(self._after_id)
+            except Exception:
+                pass
 
 
 def create_ram_tab(frame: ctk.CTkFrame, metrics_service: SystemMetricsService) -> RamTab:

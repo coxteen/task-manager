@@ -25,6 +25,7 @@ class TaskManagerApp:
         self.tab_storage = self.tabview.add("Storage")
         self.tab_theme = self.tabview.add("Theme")
 
+        # Inițializare și păstrare instanțe pentru cleanup
         self.cpu_view = cpu_tab.create_cpu_tab(self.tab_cpu, self.metrics_service)
         self.gpu_view = gpu_tab.create_gpu_tab(self.tab_gpu, self.metrics_service)
         self.ram_view = ram_tab.create_ram_tab(self.tab_ram, self.metrics_service)
@@ -32,21 +33,25 @@ class TaskManagerApp:
         self.theme_view = theme_tab.create_theme_tab(self.tab_theme)
 
     def on_closing(self):
-        for view in (self.cpu_view, self.gpu_view, self.ram_view):
+        # 1. Anulăm callback-urile active pe firul UI
+        for view in (self.cpu_view, self.gpu_view, self.ram_view, self.storage_view):
             if hasattr(view, "cleanup"):
                 view.cleanup()
 
+        # 2. Oprim worker-ul din fundal
         try:
             self.metrics_service.stop()
         except Exception:
             pass
 
+        # 3. Oprim mainloop și eliberăm fereastra
         try:
             self.root.quit()
             self.root.destroy()
         except Exception:
             pass
 
+        # 4. Închidem procesul Python curat
         sys.exit(0)
 
 
