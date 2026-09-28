@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🚀 TaskManager
+# TaskManager
 
 **A desktop system-monitoring dashboard that brings real-time CPU, GPU, RAM, and storage information into a clean Windows-inspired interface.**
 
