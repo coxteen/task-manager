@@ -200,7 +200,7 @@ The Theme tab changes the appearance mode at runtime. Edit `window_factory.py` t
 
 ## 📄 License & Author
 
-- **Author:** Costin Ghiujan ([`@coxteen`](https://github.com/coxteen))
+- **Author:** [Costin Ghiujan](https://github.com/coxteen))
 - **License:** Released under the [MIT License](LICENSE)
 
 
